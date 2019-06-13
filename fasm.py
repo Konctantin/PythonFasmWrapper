@@ -1,5 +1,5 @@
 """
-Python 2.7 binding for FASM.dll v1.71
+Python binding for FASM.dll v1.71
 
 How to use:
     fasm = FASM("FASM.DLL")
@@ -7,7 +7,7 @@ How to use:
     byte_str = fasm.AssembleAsStr("use32\n pop eax")
 """
 
-import ctypes, struct
+import ctypes, struct, sys
 
 __all__ = "FASM", "FasmStateError", "FasmError"
 
@@ -23,7 +23,9 @@ class FasmStateError(RuntimeError):
         -5 : "UNEXPECTED_END_OF_SOURCE",
         -6 : "CANNOT_GENERATE_CODE",
         -7 : "FORMAT_LIMITATIONS_EXCEDDED",
-        -8 : "WRITE_FAILED"}
+        -8 : "WRITE_FAILED"
+        }
+
     def __init__(self, *args):
         errCode = args[0]
         msg = FasmStateError.__FasmState[errCode]
@@ -70,7 +72,9 @@ class FasmError(RuntimeError):
         -135 : "TOO_MANY_REPEATS",
         -136 : "SYMBOL_OUT_OF_SCOPE",
         -140 : "USER_ERROR",
-        -141 : "ASSERTION_FAILED"}
+        -141 : "ASSERTION_FAILED"
+        }
+
     def __init__(self, *args):
         errCode = args[0]
         errLine = args[1]
@@ -100,8 +104,11 @@ class FASM:
     def Assemble(self, source, memorySize = 0x10000, passes = 100, pipes = 0):
         """ Assemble source and return byte array """
         
-        buff   = ctypes.create_string_buffer(memorySize)
-        srcPtr = ctypes.c_char_p(source)
+        buff = ctypes.create_string_buffer(memorySize)
+        if sys.hexversion < 0x03000000:
+            srcPtr = ctypes.c_char_p(source)
+        else:
+            srcPtr = ctypes.c_char_p(source.encode('utf-8'))
 
         if self.__lo_ver < 70:
             state = self.__fasm_dll.fasm_Assemble(srcPtr, buff, len(buff), passes)
@@ -125,4 +132,7 @@ class FASM:
         """ Assemble source and return byte array present as string """
 
         byte_arr = self.Assemble(source, memorySize, passes, pipes)
-        return ", ".join("0x%02X" % ord(b) for b in byte_arr)
+        if sys.hexversion < 0x03000000:
+            return ", ".join("0x%02X" % ord(b) for b in byte_arr)
+        else:
+            return ", ".join("0x%02X" % (b) for b in byte_arr)
